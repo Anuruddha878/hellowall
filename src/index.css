@@ -2,3 +2,11 @@
 
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 .animate-fadeIn { animation: fadeIn .25s ease-out }
+
+html, body, #root { height: 100%; }
+body { margin: 0; background: #0a0a0a; color: #fff; }
+
+/* Floating Buy button baseline styles (in case Tailwind not present) */
+.hw-buy {
+  border-radius: 9999px;
+}

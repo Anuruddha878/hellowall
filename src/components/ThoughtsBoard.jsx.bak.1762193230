@@ -23,6 +23,7 @@ export default function ThoughtsBoard({ account, hasHWALL, onGetCoins, onConnect
           followers: 100 + rnd(4900),
           avatar: `https://api.dicebear.com/7.x/thumbs/svg?seed=${i+1}`
         },
+        reactions: { "❤️": 0 }, myReact:null
       });
     }
     setPosts(out);
@@ -71,12 +72,17 @@ export default function ThoughtsBoard({ account, hasHWALL, onGetCoins, onConnect
                   <div style={{fontWeight:600}}>{p.author.name}</div>
                   <div style={{fontSize:12,opacity:.8}}>{(p.author.followers||0).toLocaleString()} followers</div>
                 </div>
+                {followed && <span className="chip">★ Following</span>}
               </div>
               <div style={{marginTop:8, lineHeight:1.5}}>{p.text}</div>
               <div style={{marginTop:10, display:"flex", gap:8}}>
+                <button className={"chip "+(p.myReact==='❤️'?"chip-on":"")} onClick={(e)=>{e.stopPropagation();react(p.id,'❤️')}}>
+                  ❤️ {(p.reactions["❤️"]||0).toLocaleString()}
                 </button>
                 <button className="chip" onClick={(e)=>{e.stopPropagation();follow(p.author.name)}}>
+                  {followingRef.current.has(p.author.name)?"✓ Following":"Follow"}
                 </button>
+                <button className="chip" onClick={(e)=>{e.stopPropagation();navigator.clipboard.writeText(p.text);}}>Share</button>
               </div>
             </div>
           )
@@ -98,11 +104,13 @@ export default function ThoughtsBoard({ account, hasHWALL, onGetCoins, onConnect
             </div>
             <div className="a-actions">
               <button className="chip" onClick={()=>follow(selected.author.name)}>
+                {followingRef.current.has(selected.author.name)?"✓ Following":"Follow"}
               </button>
             </div>
           </div>
           <div className="panel-text">{selected.text}</div>
           <div className="panel-row">
+            <button className={"chip "+(selected.myReact==='❤️'?"chip-on":"")} onClick={()=>react(selected.id,'❤️')}>❤️ {(selected.reactions["❤️"]||0).toLocaleString()}</button>
             <button className="chip" onClick={()=>navigator.clipboard.writeText(selected.text)}>Copy</button>
           </div>
         </aside>
