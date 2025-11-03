@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HelloWall Thoughts Preview</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- React + Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    html, body, #app { height: 100%; margin: 0; }
+    body {
+      background: linear-gradient(180deg,#0a1122 0%,#0b1020 100%);
+      color: white; overflow: hidden; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    .glass-card{
+      padding:14px 16px; border-radius:18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.16);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.10);
+      backdrop-filter: blur(12px) saturate(120%);
+      -webkit-backdrop-filter: blur(12px) saturate(120%);
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+      user-select: none;
+    }
+    .glow{ box-shadow: 0 14px 40px rgba(70,240,193,.18), inset 0 1px 0 rgba(255,255,255,.10); border-color: rgba(70,240,193,.35); }
+    .hover\:lift:hover{ transform: translateY(-2px); }
+    .chip{
+      padding:6px 10px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.22);
+      background: rgba(255,255,255,.06); color:#fff; font-size:12px;
+    }
+    .chip-on{ background: rgba(255,120,140,.22); border-color: rgba(255,120,140,.45); }
+    .panel{
+      position:fixed; right:-460px; top:0; bottom:0; width:420px;
+      background: linear-gradient(180deg, rgba(14,22,44,.88), rgba(10,16,32,.88));
+      border-left:1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(14px) saturate(120%);
+      -webkit-backdrop-filter: blur(14px) saturate(120%);
+      padding:20px; z-index:60; overflow:auto; color:#eaf1ff;
+      transition: right .25s ease;
+    }
+    .panel.show{ right:0; }
+    .panel-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .btn{
+      padding:6px 10px; border-radius:10px;
+      border:1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.08); color:#fff;
+    }
+    .btn:hover{ background: rgba(255,255,255,.12); }
+    .panel-author{ display:flex; gap:12px; align-items:center; margin-bottom:8px;}
+    .panel-author img{ border-radius:10px; border:1px solid rgba(255,255,255,.2); }
+    .a-meta{ flex:1; }
+    .a-name{ font-weight:600; }
+    .a-follow{ font-size:12px; color:#a6b2d9; }
+    .a-actions{ display:flex; gap:8px; }
+    .panel-text{ white-space:pre-wrap; line-height:1.5; margin-top:10px; }
+    .panel-row{ display:flex; gap:10px; margin-top:12px; }
+    .toast{
+      position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+      background: rgba(0,0,0,.6); color:#fff; padding:8px 12px; border-radius:10px;
+      opacity:0; pointer-events:none; transition: opacity .2s ease;
+      border:1px solid rgba(255,255,255,.2); backdrop-filter: blur(10px);
+    }
+    .toast.show{ opacity:1; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toast" class="toast"></div>
+
+  <script type="text/babel">
+    const { useEffect, useRef, useState } = React;
+
+    function ThoughtsPreview(){
+      const WORLD = 6000;
+      const [posts, setPosts] = useState([]);
+      const [selectedPost, setSelectedPost] = useState(null);
+
+      // follow memory
+      const followSetRef = useRef(new Set(JSON.parse(localStorage.getItem("hw_following") || "[]")));
+
+      // refs for dragging / panning / loop
+      const stageRef = useRef(null);
+      const cardDragRef = useRef(null);
+      const stageDragRef = useRef(null);
+      const runningRef  = useRef(true);
+
+      // camera
+      const [cam, setCam] = useState({
+        x: WORLD/2 - window.innerWidth/2,
+        y: WORLD/2 - window.innerHeight/2
+      });
+
+      // helpers
+      const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+      const num=(n)=>(n||0).toLocaleString();
+      const clamp=(v,min,max)=>Math.max(min, Math.min(max,v));
+      const toast=(msg)=>{
+        const el=document.getElementById("toast");
+        if(!el) return; el.textContent=msg; el.classList.add("show");
+        setTimeout(()=>el.classList.remove("show"), 1200);
+      };
+
+      // demo data (60 items)
+      const demoThoughts = Array.from({length:60}, (_,i)=>`Demo thought #${i+1} — this is a floating glass card preview.`);
+
+      const NAMES = ["Ethan","Noah","Ava","Mia","Liam","Zara","Kai","Lola","Ivy","Theo","Nina","Owen","Aria","Maya","Jude","Nora","Elio","Milan","Sage","Nova"];
+
+      const makeCard=(base,i)=>{
+        const angle = Math.random()*Math.PI*2;
+        const baseSpeed = 4 + Math.random()*6;      // 4–10 px/s
+        const dirBias   = (Math.random()-0.5)*0.12; // tiny per-card bias (rad/s)
+        return {
+          ...base,
+          position:{ left: Math.random()*WORLD, top: Math.random()*WORLD },
+          angle, baseSpeed, dirBias,
+          seed: 1000 + i*77 + Math.random()*100
+        };
+      };
+
+      // load demo
+      useEffect(()=>{
+        const demo = demoThoughts.map((t,i)=>{
+          const name = NAMES[i%NAMES.length];
+          return makeCard({
+            id: "demo_"+i,
+            author:{
+              id:`demo_${i}`,
+              name,
+              avatar:`https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(name)}`,
+              followers:rnd(350,9800)
+            },
+            text:t,
+            likes:rnd(0,40)
+          }, i);
+        });
+        setPosts(demo);
+      },[]);
+
+      // animation
+      useEffect(()=>{
+        runningRef.current = true;
+        let rafId = 0;
+        let lastTs = 0;
+
+        const step = (ts)=>{
+          if(!runningRef.current) return;
+          if(!lastTs) lastTs = ts;
+          let dt = (ts - lastTs)/1000; lastTs = ts;
+          dt = Math.min(Math.max(dt,0),0.05);
+          const t = ts/1000;
+
+          setPosts(prev => prev.map((p, idx)=>{
+            if(cardDragRef.current && cardDragRef.current.id===p.id) return p;
+
+            let { left, top, angle=0, baseSpeed=8, dirBias=0 } = p;
+
+            // smooth drift + unique bias
+            const n1 = Math.sin(t*0.6 + p.seed*0.17 + idx*0.31);
+            const n2 = Math.sin(t*0.9 + p.seed*0.27 + idx*0.13);
+            const turnNoise = n1*0.08 + n2*0.06;
+            angle += (turnNoise + dirBias) * dt;
+
+            // speed pulsing
+            const pulse = 1 + 0.12*Math.sin(t*0.4 + p.seed*0.7);
+            const speed = Math.max(3.5, Math.min(baseSpeed * pulse, 11.5));
+
+            // edges
+            const M=180, steer=0.9, kY=0.55;
+            if(left<M) angle += steer*dt;
+            if(left>WORLD-M) angle -= steer*dt;
+            if(top<M) angle += (steer*kY)*dt;
+            if(top>WORLD-M) angle -= (steer*kY)*dt;
+
+            left = clamp(left + Math.cos(angle)*speed*dt, 0, WORLD);
+            top  = clamp(top  + Math.sin(angle)*speed*dt, 0, WORLD);
+
+            return { ...p, position:{left,top}, angle, baseSpeed, dirBias };
+          }));
+
+          rafId = requestAnimationFrame(step);
+        };
+        rafId = requestAnimationFrame(step);
+        return ()=>{ runningRef.current=false; cancelAnimationFrame(rafId); };
+      },[]);
+
+      // pointer events (drag & pan)
+      useEffect(()=>{
+        const stage = stageRef.current;
+        if(!stage) return;
+        stage.style.touchAction="none";
+
+        const onPointerDown = (e)=>{
+          const cardEl = e.target.closest?.(".hw-card");
+          if(cardEl){
+            const id = cardEl.getAttribute("data-id");
+            const card = posts.find(p=>p.id===id);
+            if(!card) return;
+            cardEl.setPointerCapture?.(e.pointerId);
+            cardDragRef.current = {
+              id, pointerId:e.pointerId,
+              x0:e.clientX, y0:e.clientY,
+              left0:card.position.left, top0:card.position.top,
+              moved:false
+            };
+            return;
+          }
+          stage.setPointerCapture?.(e.pointerId);
+          stageDragRef.current = { pointerId:e.pointerId, x0:e.clientX, y0:e.clientY, c0:{...cam} };
+        };
+
+        const onPointerMove = (e)=>{
+          if(cardDragRef.current && cardDragRef.current.pointerId===e.pointerId){
+            const d = cardDragRef.current;
+            const dx=e.clientX-d.x0, dy=e.clientY-d.y0;
+            if(!d.moved && (Math.abs(dx)>2 || Math.abs(dy)>2)) d.moved=true;
+            const L = clamp(d.left0+dx,0,WORLD);
+            const T = clamp(d.top0 +dy,0,WORLD);
+            setPosts(prev=>prev.map(p=>p.id===d.id?{...p, position:{left:L, top:T}}:p));
+            return;
+          }
+          if(stageDragRef.current && stageDragRef.current.pointerId===e.pointerId){
+            const d = stageDragRef.current;
+            const dx=e.clientX-d.x0, dy=e.clientY-d.y0;
+            setCam({
+              x: Math.max(0, Math.min(d.c0.x - dx, WORLD - window.innerWidth)),
+              y: Math.max(0, Math.min(d.c0.y - dy, WORLD - window.innerHeight))
+            });
+          }
+        };
+
+        const onPointerUp = (e)=>{
+          if(cardDragRef.current && cardDragRef.current.pointerId===e.pointerId){
+            cardDragRef.current=null; return;
+          }
+          if(stageDragRef.current && stageDragRef.current.pointerId===e.pointerId){
+            stageDragRef.current=null;
+          }
+        };
+
+        stage.addEventListener("pointerdown", onPointerDown);
+        stage.addEventListener("pointermove", onPointerMove);
+        stage.addEventListener("pointerup", onPointerUp);
+        stage.addEventListener("pointercancel", onPointerUp);
+        stage.addEventListener("lostpointercapture", onPointerUp);
+
+        return ()=>{
+          stage.removeEventListener("pointerdown", onPointerDown);
+          stage.removeEventListener("pointermove", onPointerMove);
+          stage.removeEventListener("pointerup", onPointerUp);
+          stage.removeEventListener("pointercancel", onPointerUp);
+          stage.removeEventListener("lostpointercapture", onPointerUp);
+        };
+      },[posts, cam.x, cam.y]);
+
+      const toggleLike = (id)=>{
+        setPosts(prev=>prev.map(p=>{
+          if(p.id!==id) return p;
+          const liked = p._liked ? -1 : +1;
+          return { ...p, _liked:!p._liked, likes:Math.max(0,(p.likes||0)+liked) };
+        }));
+      };
+
+      const toggleFollow = (authorId)=>{
+        const set = followSetRef.current;
+        if(set.has(authorId)) set.delete(authorId); else set.add(authorId);
+        localStorage.setItem("hw_following", JSON.stringify([...set]));
+        setPosts(prev=>prev.map(p=>{
+          if(p.author.id!==authorId) return p;
+          const delta = set.has(authorId)?+1:-1;
+          return { ...p, author:{...p.author, followers: Math.max(0,(p.author.followers||0)+delta)} };
+        }));
+      };
+
+      const sharePost = (p)=>{
+        const url = location.href.split("#")[0];
+        if(navigator.share){
+          navigator.share({ title:"HelloWall", text:p.text, url }).catch(()=>{});
+        } else {
+          navigator.clipboard.writeText(`${p.text}\n${url}`).then(()=>toast("Link copied"));
+        }
+      };
+
+      return (
+        <div className="relative h-screen w-screen overflow-hidden">
+          <div
+            ref={stageRef}
+            className="absolute inset-0 will-change-transform"
+            style={{ width: WORLD+"px", height: WORLD+"px", transform: `translate3d(${-cam.x}px, ${-cam.y}px, 0)` }}
+          >
+            {posts.map(p=>{
+              const isFollowing = followSetRef.current.has(p.author.id);
+              const isDragging = cardDragRef.current && cardDragRef.current.id===p.id;
+              return (
+                <div
+                  key={p.id}
+                  data-id={p.id}
+                  className={"hw-card glass-card hover:lift " + (isFollowing ? "glow" : "")}
+                  style={{
+                    position:"absolute", left:p.position.left, top:p.position.top, maxWidth:560,
+                    cursor: isDragging ? "grabbing":"grab", touchAction:"none"
+                  }}
+                  onClick={(e)=>{
+                    if(cardDragRef.current && cardDragRef.current.moved) return;
+                    setSelectedPost(p);
+                  }}
+                >
+                  <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+                    <img src={p.author.avatar} width={44} height={44} alt=""
+                         style={{ borderRadius:12, border:"1px solid rgba(255,255,255,.18)" }}/>
+                    <div style={{ flex:1 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, color:"#dfe7ff", fontWeight:600, fontSize:14 }}>
+                        <span>{p.author.name}</span>
+                        <span style={{ fontSize:11, color:"#9db0d7" }}>• {num(p.author.followers)}</span>
+                      </div>
+                      <div style={{ marginTop:8, fontSize:15, lineHeight:1.45, color:"#eaf1ff" }}>
+                        {p.text}
+                      </div>
+                      <div style={{ marginTop:10, display:"flex", gap:10, alignItems:"center", opacity:.9 }}>
+                        <button className={"chip " + (p._liked?"chip-on":"")}
+                          onPointerDown={(e)=>e.stopPropagation()}
+                          onClick={(e)=>{ e.stopPropagation(); toggleLike(p.id); }}>❤️ {num(p.likes||0)}</button>
+                        <button className="chip"
+                          onPointerDown={(e)=>e.stopPropagation()}
+                          onClick={(e)=>{ e.stopPropagation(); toggleFollow(p.author.id); }}>
+                          {followSetRef.current.has(p.author.id) ? "✓ Following" : "Follow"}
+                        </button>
+                        <button className="chip"
+                          onPointerDown={(e)=>e.stopPropagation()}
+                          onClick={(e)=>{ e.stopPropagation(); sharePost(p); }}>Share</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Side panel */}
+          <aside className={"panel " + (selectedPost ? "show" : "")}>
+            {selectedPost && (
+              <>
+                <div className="panel-head">
+                  <h3>Thought</h3>
+                  <button className="btn" onClick={()=>setSelectedPost(null)}>✕</button>
+                </div>
+                <div className="panel-author">
+                  <img src={selectedPost.author.avatar} width={40} height={40} alt=""/>
+                  <div className="a-meta">
+                    <div className="a-name">{selectedPost.author.name}</div>
+                    <div className="a-follow">{num(selectedPost.author.followers)} followers</div>
+                  </div>
+                  <div className="a-actions">
+                    <button className="chip" onClick={()=>toggleFollow(selectedPost.author.id)}>
+                      {followSetRef.current.has(selectedPost.author.id) ? "✓ Following" : "Follow"}
+                    </button>
+                  </div>
+                </div>
+                <div className="panel-text">{selectedPost.text}</div>
+                <div className="panel-row">
+                  <button className={"chip " + (selectedPost._liked ? "chip-on" : "")}
+                    onClick={()=>toggleLike(selectedPost.id)}>❤️ {num(selectedPost.likes||0)}</button>
+                  <button className="chip" onClick={()=>sharePost(selectedPost)}>Share</button>
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('app')).render(<ThoughtsPreview />);
+  </script>
+</body>
+</html>
