@@ -1,0 +1,13 @@
+[dotenv@17.2.3] injecting env (8) from .env -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+
+[dotenv@17.2.3] injecting env (9) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+Deploying HelloWall with params: {
+  HWALL_TOKEN: '0x9abc1234abcd5678ef901234abcd5678ef90abcd',
+  MIN_TOKENS: '100000000000000000000',
+  FEE_BPS: 0,
+  TREASURY: '0x9864BE270beCAB35ce62D5Ba793796588Fca5b78',
+  OWNER: '0x9864BE270beCAB35ce62D5Ba793796588Fca5b78'
+}
+✅ HelloWall deployed at: 0xdEA87C6660DAd8cf9E12EFed95E032Fc1B369BAa
+📝 Saved addresses.json

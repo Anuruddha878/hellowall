@@ -1,0 +1,11 @@
+{
+  "name": "Hello Wall",
+  "symbol": "HWALL",
+  "type": "ERC20",
+  "decimals": 18,
+  "description": "Hello Wall (HWALL) is a community token celebrating creativity and kindness, inspired by Bobo’s world of positivity.",
+  "website": "https://hellowall.io",
+  "explorer": "https://polygonscan.com/token/0x688546B4819b637aF3657EEb2752c081316fA7D1",
+  "status": "active",
+  "id": "hellowall"
+}

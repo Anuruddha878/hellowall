@@ -1,0 +1,6 @@
+.exit
+exit
+await c.owner();
+const c = new ethers.Contract("0x688546B4819b637aF3657EEb2752c081316fA7D1", i, (await ethers.getSigners())[0]);
+const i = new ethers.Interface(["function owner() view returns (address)"]);
+npx hardhat console --network polygon
