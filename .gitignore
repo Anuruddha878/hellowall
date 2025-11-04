@@ -8,3 +8,5 @@ dist
 
 npm
 vite
+
+.env.local
