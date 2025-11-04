@@ -5,3 +5,6 @@ dist
 *.log
 .env
 .env.local
+
+npm
+vite
